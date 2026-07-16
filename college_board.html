@@ -702,11 +702,11 @@ function wireMatchToggle(){
 }
 
 // ---------- Saved filters ----------
-// Two modes, auto-selected by whether SCRIPT_URL is filled in:
-//  - SCRIPT_URL set: saved filters live in the "SavedFilters" tab of the
-//    sheet itself, shared with anyone who opens this page (read via gviz,
-//    written via a small Apps Script Web App — see setup notes).
-//  - SCRIPT_URL blank: falls back to this browser's localStorage only.
+// Two tiers that coexist:
+//  - Private: this browser only, via localStorage. Always available.
+//  - Shared: lives in the "SavedFilters" tab of the sheet, visible to
+//    anyone who opens this page (read via gviz, written via a small Apps
+//    Script Web App). Only offered when SCRIPT_URL below is filled in.
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzMv5EFzG4EowwqI4ZYAPhroHQORsyD4BVyJ26c6KtQW-HLxnc1pmphtESURp4ZHtg/exec';
 const SAVED_FILTERS_SHEET = 'SavedFilters';
 const SAVED_FILTERS_KEY = 'laxBoard_savedFilters_v1';
@@ -727,9 +727,6 @@ function writeSavedFilters(list){
   } catch(e){
     storageAvailable = false;
   }
-}
-function currentFilterList(){
-  return SCRIPT_URL ? sharedFiltersCache : readSavedFilters();
 }
 
 // Reads the "SavedFilters" tab the same way the Schools tab is read —
@@ -843,13 +840,35 @@ function applySavedFilterData(d){
   render();
 }
 
+// Dropdown values are prefixed "local:<i>" or "shared:<i>" so the two
+// tiers can live in one control without index collisions.
 function populateSavedFilterSelect(){
   const sel = document.getElementById('savedFilterSelect');
-  const list = currentFilterList();
+  const local = readSavedFilters();
+  const shared = SCRIPT_URL ? sharedFiltersCache : [];
   const current = sel.value;
-  sel.innerHTML = '<option value="">Select a saved filter…</option>' +
-    list.map((f,i)=>`<option value="${i}">${f.name}</option>`).join('');
-  if(list[current]) sel.value = current;
+  let html = '<option value="">Select a saved filter…</option>';
+  if(local.length){
+    html += '<optgroup label="My filters (this device)">' +
+      local.map((f,i)=>`<option value="local:${i}">${f.name}</option>`).join('') +
+      '</optgroup>';
+  }
+  if(shared.length){
+    html += '<optgroup label="Shared filters">' +
+      shared.map((f,i)=>`<option value="shared:${i}">${f.name}</option>`).join('') +
+      '</optgroup>';
+  }
+  sel.innerHTML = html;
+  const stillExists = [...sel.options].some(o=>o.value===current);
+  if(stillExists) sel.value = current;
+}
+function getSavedEntry(value){
+  if(!value) return null;
+  const [kind, idxStr] = value.split(':');
+  const idx = Number(idxStr);
+  if(kind === 'local') return {kind, entry: readSavedFilters()[idx]};
+  if(kind === 'shared') return {kind, entry: sharedFiltersCache[idx]};
+  return null;
 }
 
 // ---------- Portable filter links (works cross-browser/device, no storage needed) ----------
@@ -923,16 +942,15 @@ function wireSavedFilters(){
   refreshSavedFilterUI();
 
   const note = document.getElementById('savedNote');
-  if(SCRIPT_URL){
-    note.textContent = 'Shared — saved filters live in the sheet and are visible to anyone with this link.';
-    note.classList.remove('hidden');
-  } else if(!storageAvailable){
-    document.getElementById('saveFilterBtn').disabled = true;
+  if(!storageAvailable){
     document.getElementById('savedFilterSelect').disabled = true;
-    note.textContent = "Your browser is blocking local storage, so saved filters can't persist here.";
+    note.textContent = "Your browser is blocking local storage, so private filters can't persist here (shared filters still work).";
+    note.classList.remove('hidden');
+  } else if(SCRIPT_URL){
+    note.textContent = '"My filters" stay on this device only. "Shared" filters are visible to anyone who opens this page.';
     note.classList.remove('hidden');
   } else {
-    note.textContent = 'Saved in this browser only — set up SCRIPT_URL to share these across devices.';
+    note.textContent = 'Saved on this device only — set up SCRIPT_URL to add shareable filters too.';
     note.classList.remove('hidden');
   }
 
@@ -943,12 +961,19 @@ function wireSavedFilters(){
     const data = serializeCurrentFilters();
     const btn = document.getElementById('saveFilterBtn');
 
+    let saveShared = false;
     if(SCRIPT_URL){
+      saveShared = confirm(`Save "${trimmed}" as a SHARED filter — visible to anyone who opens this page?\n\nClick Cancel to save it privately on this device only.`);
+    }
+
+    if(saveShared){
       btn.disabled = true; btn.textContent = 'Saving…';
       saveFilterRemote(trimmed, data).then(ok=>{
         btn.disabled = false; btn.textContent = '+ Save current';
         if(!ok){ alert('Could not save to the sheet. Check that SCRIPT_URL is correct and the Apps Script is deployed with "Anyone" access.'); return; }
         refreshSavedFilterUI();
+        document.getElementById('savedFilterSelect').value = 'shared:' + sharedFiltersCache.findIndex(f=>f.name===trimmed);
+        document.getElementById('deleteSavedBtn').classList.remove('hidden');
       });
     } else {
       const list = readSavedFilters();
@@ -957,7 +982,7 @@ function wireSavedFilters(){
       else list.push({name: trimmed, data});
       writeSavedFilters(list);
       populateSavedFilterSelect();
-      document.getElementById('savedFilterSelect').value = String(list.findIndex(f=>f.name===trimmed));
+      document.getElementById('savedFilterSelect').value = 'local:' + list.findIndex(f=>f.name===trimmed);
       document.getElementById('deleteSavedBtn').classList.remove('hidden');
     }
   });
@@ -966,20 +991,19 @@ function wireSavedFilters(){
     const del = document.getElementById('deleteSavedBtn');
     if(e.target.value === ''){ del.classList.add('hidden'); return; }
     del.classList.remove('hidden');
-    const list = currentFilterList();
-    const entry = list[Number(e.target.value)];
-    if(entry) applySavedFilterData(entry.data);
+    const found = getSavedEntry(e.target.value);
+    if(found && found.entry) applySavedFilterData(found.entry.data);
   });
 
   document.getElementById('deleteSavedBtn').addEventListener('click', ()=>{
     const sel = document.getElementById('savedFilterSelect');
     if(sel.value === '') return;
-    const list = currentFilterList();
-    const entry = list[Number(sel.value)];
-    if(!entry) return;
-    if(!confirm(`Delete saved filter "${entry.name}"?`)) return;
+    const found = getSavedEntry(sel.value);
+    if(!found || !found.entry) return;
+    const entry = found.entry;
+    if(!confirm(`Delete ${found.kind === 'shared' ? 'shared' : 'private'} filter "${entry.name}"?`)) return;
 
-    if(SCRIPT_URL){
+    if(found.kind === 'shared'){
       deleteFilterRemote(entry.name).then(ok=>{
         if(!ok){ alert('Could not delete from the sheet.'); return; }
         refreshSavedFilterUI();
@@ -987,7 +1011,9 @@ function wireSavedFilters(){
         document.getElementById('deleteSavedBtn').classList.add('hidden');
       });
     } else {
-      list.splice(Number(sel.value), 1);
+      const list = readSavedFilters();
+      const idx = list.findIndex(f=>f.name===entry.name);
+      if(idx >= 0) list.splice(idx, 1);
       writeSavedFilters(list);
       populateSavedFilterSelect();
       sel.value = '';
