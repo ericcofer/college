@@ -1163,7 +1163,18 @@ function renderRows(rows){
 
 function claudePromptFor(r){
   const progLabel = r.ncaa_lax ? `NCAA ${r.ncaa_div}` : (r.mcla_lax ? 'MCLA club' : 'lacrosse');
-  return `Tell me about ${r.name} in ${r.city}, ${r.state}. Give me the basics: academic reputation, campus size and setting, approximate cost, and what its ${progLabel} lacrosse program is like. I'm a high school lacrosse player considering it for college.`;
+  return `Tell me about ${r.name} in ${r.city}, ${r.state}. I'm a high school lacrosse player considering it for college and its ${progLabel} program.
+
+Please show me:
+- Current tuition, room & board, and other required costs (in-state and out-of-state if it applies)
+- Who I should reach out to for lacrosse recruiting, including their email address
+- Whether there's a lacrosse recruit questionnaire/form I need to fill out, and a link if so
+- Where to find the timeline and deadlines for applying
+- Whether the SAT/ACT is considered for admission (required, optional, or test-blind)
+
+Also give me the basics: academic reputation, and campus size and setting.
+
+Please return this information in table and/or bullet form.`;
 }
 
 function wireLinksDelegation(){
