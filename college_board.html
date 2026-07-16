@@ -454,6 +454,7 @@ const SHEET_ID = '1pfefuZfWV2rptY9LoWCrs-tlZqNDlkTlaFIn-7N316g';
 const SHEET_NAME = 'Schools';
 
 let DATA = [];
+let sliderMax = 65000;
 
 const columns = [
   {key:'name', label:'School', sort:true},
@@ -469,7 +470,7 @@ const columns = [
 
 let state = {
   search:'', stateFilter:'', ownership:'', divFilter:new Set(),
-  wue:false, sage:false, interested:false, maxTuition:65000,
+  wue:false, sage:false, interested:false, maxTuition:Infinity,
   sortKey:'name', sortDir:1,
 };
 
@@ -818,19 +819,20 @@ function wireControls(){
   document.getElementById('sageCheck').addEventListener('change', e=>{ state.sage = e.target.checked; render(); });
   document.getElementById('interestedCheck').addEventListener('change', e=>{ state.interested = e.target.checked; render(); });
   document.getElementById('tuitionSlider').addEventListener('input', e=>{
-    state.maxTuition = Number(e.target.value);
-    document.getElementById('tuitionVal').textContent = state.maxTuition >= 65000 ? 'Any' : '$'+state.maxTuition.toLocaleString();
+    const v = Number(e.target.value);
+    state.maxTuition = v >= sliderMax ? Infinity : v;
+    document.getElementById('tuitionVal').textContent = v >= sliderMax ? 'Any' : '$'+v.toLocaleString();
     render();
   });
   document.getElementById('resetBtn').addEventListener('click', ()=>{
-    state = {search:'', stateFilter:'', ownership:'', divFilter:new Set(), wue:false, sage:false, interested:false, maxTuition:65000, sortKey:'name', sortDir:1};
+    state = {search:'', stateFilter:'', ownership:'', divFilter:new Set(), wue:false, sage:false, interested:false, maxTuition:Infinity, sortKey:'name', sortDir:1};
     document.getElementById('searchInput').value='';
     document.getElementById('stateSelect').value='';
     document.getElementById('ownershipSelect').value='';
     document.getElementById('wueCheck').checked=false;
     document.getElementById('sageCheck').checked=false;
     document.getElementById('interestedCheck').checked=false;
-    document.getElementById('tuitionSlider').value=65000;
+    document.getElementById('tuitionSlider').value=sliderMax;
     document.getElementById('tuitionVal').textContent='Any';
     document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
     render();
@@ -964,6 +966,16 @@ function initApp(){
 
   // reset any filters from a previous load so stale option elements don't linger
   document.getElementById('stateSelect').innerHTML = '<option value="">All states</option>';
+
+  // size the tuition slider to the real data instead of a guessed ceiling —
+  // otherwise "Any" can silently exclude schools priced above a stale cap
+  const tuitions = DATA.map(r=>r.tuition_out).filter(v=>v!==null && v!==undefined);
+  sliderMax = tuitions.length ? Math.ceil(Math.max(...tuitions)/1000)*1000 : 65000;
+  const slider = document.getElementById('tuitionSlider');
+  slider.max = sliderMax;
+  slider.value = sliderMax;
+  state.maxTuition = Infinity;
+  document.getElementById('tuitionVal').textContent = 'Any';
 
   populateStateFilter();
   renderStats();
