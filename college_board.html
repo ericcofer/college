@@ -731,7 +731,7 @@ function loadSharedFilters(callback){
   window.__onSavedFiltersData = function(json){
     try{
       if(!json || json.status !== 'ok'){ callback([]); return; }
-      const rows = (json.table.rows || []).slice(1); // row 0 = Name/Data/UpdatedAt header
+      const rows = json.table.rows || []; // headers=1 already strips the Name/Data/UpdatedAt header row
       const list = rows.map(r=>{
         const name = r.c && r.c[0] ? r.c[0].v : null;
         const dataStr = r.c && r.c[1] ? r.c[1].v : null;
