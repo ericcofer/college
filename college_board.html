@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recruiting Board — College Lacrosse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --turf:#173B2B;
+    --turf-dark:#0D2419;
+    --chalk:#F6F3EA;
+    --chalk-dim:#EAE5D6;
+    --gold:#C6952F;
+    --gold-bright:#E0AE4A;
+    --ink:#16201A;
+    --ink-dim:#54604F;
+    --line:#FFFFFF;
+    --brick:#9C4438;
+    --card:#FFFFFF;
+    --shadow: 0 1px 2px rgba(13,36,25,0.06), 0 8px 24px rgba(13,36,25,0.06);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--chalk);color:var(--ink);font-family:'Inter',sans-serif;}
+  ::selection{background:var(--gold-bright);color:var(--turf-dark);}
+
+  /* ---------- Header / Scoreboard ---------- */
+  header.board{
+    position:relative;
+    background:var(--turf);
+    background-image:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 2px, transparent 2px 74px);
+    color:var(--chalk);
+    padding:38px 32px 28px;
+    overflow:hidden;
+  }
+  header.board::after{
+    content:"";
+    position:absolute; left:0; right:0; bottom:0; height:6px;
+    background:linear-gradient(90deg, var(--gold) 0%, var(--gold-bright) 50%, var(--gold) 100%);
+  }
+  .eyebrow{
+    font-family:'Barlow Condensed', sans-serif;
+    letter-spacing:0.32em;
+    text-transform:uppercase;
+    font-size:12px;
+    color:var(--gold-bright);
+    font-weight:600;
+    margin-bottom:6px;
+  }
+  h1{
+    font-family:'Anton', sans-serif;
+    font-weight:400;
+    letter-spacing:0.01em;
+    font-size:clamp(34px,5.5vw,56px);
+    line-height:0.95;
+    margin:0 0 6px 0;
+    text-transform:uppercase;
+  }
+  h1 span{color:var(--gold-bright);}
+  .subhead{
+    font-family:'Barlow Condensed', sans-serif;
+    font-size:17px;
+    color:#CFE0D3;
+    max-width:640px;
+    font-weight:500;
+  }
+
+  .stat-strip{
+    display:flex; gap:0; flex-wrap:wrap;
+    margin-top:24px;
+    border-top:1px solid rgba(255,255,255,0.14);
+  }
+  .stat{
+    padding:14px 26px 4px 0;
+    margin-right:26px;
+    min-width:90px;
+  }
+  .stat .num{
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:26px;
+    color:var(--chalk);
+  }
+  .stat .lbl{
+    font-family:'Barlow Condensed', sans-serif;
+    text-transform:uppercase;
+    letter-spacing:0.12em;
+    font-size:11.5px;
+    color:#9FBBA5;
+    font-weight:600;
+  }
+
+  /* ---------- Filter rail ---------- */
+  .controls{
+    background:var(--card);
+    border-bottom:1px solid #E3DDCB;
+    padding:18px 32px;
+    position:sticky; top:0; z-index:20;
+    box-shadow:var(--shadow);
+  }
+  .controls-row{
+    display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center;
+  }
+  .search-wrap{position:relative; flex:1 1 220px; max-width:320px;}
+  .search-wrap input{
+    width:100%;
+    padding:10px 12px 10px 34px;
+    border:1.5px solid #DCD5C0;
+    border-radius:8px;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    background:var(--chalk);
+    color:var(--ink);
+  }
+  .search-wrap input:focus{outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold);}
+  .search-wrap svg{position:absolute; left:11px; top:50%; transform:translateY(-50%); opacity:0.5;}
+
+  select, .num-input{
+    padding:9px 10px;
+    border:1.5px solid #DCD5C0;
+    border-radius:8px;
+    background:var(--chalk);
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    color:var(--ink);
+  }
+  select:focus, .num-input:focus{outline:2px solid var(--gold); outline-offset:1px;}
+
+  .chip-group{display:flex; gap:6px; flex-wrap:wrap;}
+  .chip{
+    font-family:'Barlow Condensed', sans-serif;
+    font-weight:600;
+    letter-spacing:0.03em;
+    font-size:14px;
+    padding:7px 14px;
+    border-radius:999px;
+    border:1.5px solid #DCD5C0;
+    background:var(--chalk);
+    color:var(--ink-dim);
+    cursor:pointer;
+    user-select:none;
+    transition:background .12s, color .12s, border-color .12s;
+  }
+  .chip:hover{border-color:var(--gold);}
+  .chip.active{
+    background:var(--turf);
+    border-color:var(--turf);
+    color:var(--chalk);
+  }
+  .chip.active .chip-dot{background:var(--gold-bright);}
+
+  .toggle{
+    display:flex; align-items:center; gap:6px;
+    font-family:'Barlow Condensed', sans-serif;
+    font-weight:600; font-size:14px;
+    color:var(--ink-dim);
+    cursor:pointer;
+    padding:7px 12px 7px 8px;
+    border-radius:8px;
+    border:1.5px solid transparent;
+  }
+  .toggle:hover{background:var(--chalk-dim);}
+  .toggle input{accent-color:var(--turf); width:15px; height:15px;}
+
+  .reset-btn{
+    margin-left:auto;
+    font-family:'Barlow Condensed', sans-serif;
+    font-weight:600; font-size:14px; letter-spacing:0.03em;
+    color:var(--brick);
+    background:none; border:1.5px solid transparent;
+    cursor:pointer;
+    padding:8px 10px;
+  }
+  .reset-btn:hover{text-decoration:underline;}
+
+  .controls-row2{
+    display:flex; gap:16px; align-items:center; margin-top:12px; flex-wrap:wrap;
+  }
+  .slider-block{display:flex; align-items:center; gap:10px; flex:1 1 260px; max-width:420px;}
+  .slider-block label{
+    font-family:'Barlow Condensed', sans-serif; font-weight:600; font-size:13.5px;
+    color:var(--ink-dim); white-space:nowrap;
+  }
+  .slider-block input[type=range]{flex:1; accent-color:var(--turf);}
+  .slider-val{
+    font-family:'JetBrains Mono', monospace; font-size:12.5px; font-weight:700;
+    color:var(--turf); min-width:64px; text-align:right;
+  }
+
+  .result-line{
+    padding:14px 32px 4px;
+    font-family:'Barlow Condensed', sans-serif;
+    font-size:14px;
+    color:var(--ink-dim);
+    font-weight:600;
+  }
+  .result-line b{color:var(--turf); font-weight:700;}
+
+  /* ---------- Table ---------- */
+  .table-wrap{padding:6px 32px 48px;}
+  table{width:100%; border-collapse:collapse; background:var(--card); border-radius:12px; overflow:hidden; box-shadow:var(--shadow);}
+  thead th{
+    text-align:left;
+    font-family:'Barlow Condensed', sans-serif;
+    text-transform:uppercase;
+    font-size:12.5px;
+    letter-spacing:0.06em;
+    font-weight:700;
+    color:var(--chalk);
+    background:var(--turf-dark);
+    padding:12px 14px;
+    cursor:pointer;
+    white-space:nowrap;
+    position:relative;
+  }
+  thead th:hover{background:#0A1E14;}
+  thead th .arrow{opacity:0.45; margin-left:4px; font-size:11px;}
+  thead th.sorted .arrow{opacity:1; color:var(--gold-bright);}
+  tbody td{
+    padding:11px 14px;
+    font-size:13.5px;
+    border-bottom:1px solid #EFEAD9;
+    vertical-align:middle;
+  }
+  tbody tr:hover{background:#FBF8EF;}
+  tbody tr.interested{background:#FCF3DE;}
+  tbody tr.interested:hover{background:#F9ECC7;}
+  .school-name{font-weight:600; color:var(--ink);}
+  .school-loc{font-size:12px; color:var(--ink-dim);}
+  .mono{font-family:'JetBrains Mono', monospace; font-size:12.5px;}
+  .badge{
+    display:inline-block; font-family:'Barlow Condensed', sans-serif; font-weight:700; font-size:11.5px;
+    letter-spacing:0.03em; padding:3px 8px; border-radius:5px; text-transform:uppercase;
+  }
+  .badge.d1{background:#E4EEE6; color:var(--turf);}
+  .badge.d2{background:#DCE9E0; color:#1F5A3C;}
+  .badge.d3{background:#E9E4CF; color:#7A5E20;}
+  .badge.mcla{background:#EFE1E0; color:var(--brick);}
+  .badge.none{background:#F1EFE7; color:#B7B0A0;}
+  .pill{
+    display:inline-flex; align-items:center; gap:4px;
+    font-family:'Barlow Condensed', sans-serif; font-weight:600; font-size:11.5px;
+    padding:2px 7px; border-radius:999px; border:1px solid #DCD5C0; color:var(--ink-dim);
+  }
+  .star{color:var(--gold); font-size:14px;}
+  .empty-state{
+    text-align:center; padding:64px 20px; color:var(--ink-dim);
+    font-family:'Barlow Condensed', sans-serif; font-size:16px;
+  }
+
+  /* ---------- Advanced conditions ---------- */
+  .adv-panel{
+    background:var(--chalk-dim);
+    border-top:1px solid #E3DDCB;
+    padding:16px 32px 20px;
+  }
+  .adv-head{
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:12px;
+  }
+  .adv-title{
+    font-family:'Barlow Condensed', sans-serif;
+    text-transform:uppercase; letter-spacing:0.1em;
+    font-size:13px; font-weight:700; color:var(--turf);
+  }
+  .match-toggle{
+    display:inline-flex; border:1.5px solid var(--turf); border-radius:999px; overflow:hidden;
+  }
+  .match-toggle button{
+    font-family:'Barlow Condensed', sans-serif; font-weight:700; font-size:12.5px;
+    letter-spacing:0.05em; text-transform:uppercase;
+    border:none; background:var(--chalk); color:var(--turf);
+    padding:6px 14px; cursor:pointer;
+  }
+  .match-toggle button.active{background:var(--turf); color:var(--chalk);}
+  .match-help{
+    font-family:'Barlow Condensed', sans-serif; font-size:12.5px; color:var(--ink-dim);
+  }
+  .add-cond-btn{
+    margin-left:auto;
+    font-family:'Barlow Condensed', sans-serif; font-weight:700; font-size:13px; letter-spacing:0.03em;
+    background:var(--turf); color:var(--chalk); border:none; border-radius:7px;
+    padding:8px 14px; cursor:pointer;
+  }
+  .add-cond-btn:hover{background:var(--turf-dark);}
+  .cond-list{display:flex; flex-direction:column; gap:8px;}
+  .cond-row{
+    display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+    background:var(--card); border:1.5px solid #E3DDCB; border-radius:9px;
+    padding:8px 10px;
+  }
+  .cond-row .cond-join{
+    font-family:'JetBrains Mono', monospace; font-weight:700; font-size:11.5px;
+    color:var(--gold); background:#FBF1DC; border-radius:5px; padding:3px 7px;
+    min-width:30px; text-align:center; flex:0 0 auto;
+  }
+  .cond-row select, .cond-row input{
+    padding:7px 9px; border:1.5px solid #DCD5C0; border-radius:6px;
+    background:var(--chalk); font-family:'Inter',sans-serif; font-size:13px; color:var(--ink);
+  }
+  .cond-row .cond-field{min-width:150px;}
+  .cond-row .cond-op{min-width:120px;}
+  .cond-row .cond-val{min-width:130px; flex:1 1 130px;}
+  .cond-remove{
+    margin-left:auto; background:none; border:none; color:var(--brick);
+    font-size:18px; line-height:1; cursor:pointer; padding:4px 6px; flex:0 0 auto;
+  }
+  .cond-remove:hover{opacity:0.7;}
+  .cond-empty{
+    font-family:'Barlow Condensed', sans-serif; font-size:13.5px; color:var(--ink-dim);
+    padding:6px 2px;
+  }
+
+  /* ---------- Sync status / loading / error ---------- */
+  .sync-row{
+    display:flex; align-items:center; gap:10px; margin-top:16px;
+    font-family:'Barlow Condensed', sans-serif; font-size:13px; color:#B9CDBE;
+  }
+  .sync-dot{width:8px; height:8px; border-radius:50%; background:var(--gold-bright); flex:0 0 auto;}
+  .sync-dot.loading{background:#E0AE4A; animation:pulse 1s infinite ease-in-out;}
+  .sync-dot.error{background:var(--brick);}
+  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:0.3;}}
+  .refresh-btn{
+    font-family:'Barlow Condensed', sans-serif; font-weight:700; font-size:12.5px; letter-spacing:0.05em;
+    text-transform:uppercase; background:rgba(255,255,255,0.1); color:var(--chalk);
+    border:1px solid rgba(255,255,255,0.25); border-radius:999px; padding:5px 12px; cursor:pointer;
+  }
+  .refresh-btn:hover{background:rgba(255,255,255,0.18);}
+  .refresh-btn:disabled{opacity:0.5; cursor:default;}
+
+  .load-screen{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:100px 20px; gap:14px;
+    font-family:'Barlow Condensed', sans-serif; font-size:16px; color:var(--ink-dim);
+  }
+  .spinner{
+    width:32px; height:32px; border-radius:50%;
+    border:3px solid #E3DDCB; border-top-color:var(--turf);
+    animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .error-screen{
+    max-width:560px; margin:60px auto; padding:28px 30px;
+    background:#FBEDEA; border:1.5px solid #E8B8B0; border-radius:12px;
+    font-family:'Inter',sans-serif; color:var(--ink);
+  }
+  .error-screen h3{
+    font-family:'Barlow Condensed', sans-serif; text-transform:uppercase; letter-spacing:0.04em;
+    color:var(--brick); margin:0 0 8px 0; font-size:18px;
+  }
+  .error-screen p{font-size:14px; line-height:1.55; margin:0 0 10px 0; color:var(--ink-dim);}
+  .error-screen code{background:#fff; padding:1px 5px; border-radius:4px; font-size:12.5px;}
+  .error-screen .refresh-btn{
+    background:var(--brick); color:#fff; border-color:var(--brick); margin-top:6px;
+  }
+  .hidden{display:none !important;}
+
+  @media (max-width:720px){
+    header.board{padding:28px 18px 22px;}
+    .controls{padding:14px 18px;}
+    .table-wrap{padding:6px 10px 40px;}
+    .result-line{padding:12px 18px 4px;}
+    thead th, tbody td{padding:9px 8px; font-size:12.5px;}
+  }
+</style>
+</head>
+<body>
+
+<header class="board">
+  <div class="eyebrow">Class of 2027 &middot; Attack</div>
+  <h1>Recruiting <span>Board</span></h1>
+  <div class="subhead">Every four-year school fielding an NCAA or club (MCLA) lacrosse program — filter and sort by cost, division, location, or admit rate.</div>
+  <div class="sync-row">
+    <span class="sync-dot" id="syncDot"></span>
+    <span id="syncText">Connecting to sheet…</span>
+    <button class="refresh-btn" id="refreshBtn">Refresh now</button>
+  </div>
+  <div class="stat-strip" id="statStrip"></div>
+</header>
+
+<div id="loadScreen" class="load-screen">
+  <div class="spinner"></div>
+  <div>Pulling the latest from the "Schools" tab…</div>
+</div>
+
+<div id="errorScreen" class="error-screen hidden">
+  <h3>Couldn't load live data</h3>
+  <p id="errorMsg"></p>
+  <p>Most common cause: the sheet isn't shared for anonymous access. In Google Sheets, click <b>Share</b> → <b>General access</b> → set to <b>Anyone with the link (Viewer)</b>, then hit refresh below.</p>
+  <button class="refresh-btn" id="retryBtn">Try again</button>
+</div>
+
+<div id="appBody" class="hidden">
+<div class="controls">
+  <div class="controls-row">
+    <div class="search-wrap">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#54604F" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="searchInput" type="text" placeholder="Search school or city…">
+    </div>
+    <select id="stateSelect"><option value="">All states</option></select>
+    <select id="ownershipSelect">
+      <option value="">Public &amp; private</option>
+      <option value="Public">Public only</option>
+      <option value="Private nonprofit">Private only</option>
+    </select>
+    <label class="toggle"><input type="checkbox" id="wueCheck"> WUE eligible</label>
+    <label class="toggle"><input type="checkbox" id="sageCheck"> SAGE eligible</label>
+    <label class="toggle"><input type="checkbox" id="interestedCheck"> Flagged interested</label>
+    <button class="reset-btn" id="resetBtn">Reset filters</button>
+  </div>
+  <div class="controls-row">
+    <div class="chip-group" id="divChips"></div>
+  </div>
+  <div class="controls-row2">
+    <div class="slider-block">
+      <label for="tuitionSlider">Max out-of-state tuition</label>
+      <input type="range" id="tuitionSlider" min="0" max="65000" step="1000" value="65000">
+      <span class="slider-val" id="tuitionVal">Any</span>
+    </div>
+  </div>
+</div>
+
+<div class="adv-panel">
+  <div class="adv-head">
+    <span class="adv-title">Advanced conditions</span>
+    <div class="match-toggle">
+      <button id="matchAll" class="active">Match ALL (AND)</button>
+      <button id="matchAny">Match ANY (OR)</button>
+    </div>
+    <span class="match-help" id="matchHelp">Every condition below must be true.</span>
+    <button class="add-cond-btn" id="addCondBtn">+ Add condition</button>
+  </div>
+  <div class="cond-list" id="condList"></div>
+</div>
+
+<div class="result-line" id="resultLine"></div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr id="headRow"></tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="empty-state" id="emptyState" style="display:none;">No schools match those filters. Try loosening a filter or hit Reset.</div>
+</div>
+</div>
+
+<script>
+const SHEET_ID = '1pfefuZfWV2rptY9LoWCrs-tlZqNDlkTlaFIn-7N316g';
+const SHEET_NAME = 'Schools';
+
+let DATA = [];
+
+const columns = [
+  {key:'name', label:'School', sort:true},
+  {key:'loc', label:'Location', sort:false},
+  {key:'ownership', label:'Type', sort:true},
+  {key:'lax', label:'Lacrosse', sort:false},
+  {key:'tuition_in', label:'In-State', sort:true},
+  {key:'tuition_out', label:'Out-of-State', sort:true},
+  {key:'ug_enroll', label:'UG Enroll', sort:true},
+  {key:'admit_rate', label:'Admit Rate', sort:true},
+  {key:'elig', label:'Eligibility', sort:false},
+];
+
+let state = {
+  search:'', stateFilter:'', ownership:'', divFilter:new Set(),
+  wue:false, sage:false, interested:false, maxTuition:65000,
+  sortKey:'name', sortDir:1,
+};
+
+// ---------- Advanced condition builder ----------
+const FIELDS = [
+  {key:'name', label:'School Name', type:'text'},
+  {key:'city', label:'City', type:'text'},
+  {key:'state', label:'State', type:'select', options:null}, // filled in from data
+  {key:'ownership', label:'School Type', type:'select', options:['Public','Private nonprofit','Private for-profit']},
+  {key:'ncaa_div', label:'NCAA Division', type:'select', options:['Division I','Division II','Division III']},
+  {key:'ncaa_lax', label:'Has NCAA Lacrosse', type:'bool'},
+  {key:'mcla_lax', label:'Has MCLA Club', type:'bool'},
+  {key:'wue', label:'WUE Eligible', type:'bool'},
+  {key:'sage', label:'SAGE Eligible', type:'bool'},
+  {key:'interested', label:'Flagged Interested', type:'flag'},
+  {key:'tuition_in', label:'In-State Tuition ($)', type:'number'},
+  {key:'tuition_out', label:'Out-of-State Tuition ($)', type:'number'},
+  {key:'ug_enroll', label:'UG Enrollment', type:'number'},
+  {key:'admit_rate', label:'Admit Rate (%)', type:'percent'},
+];
+
+const OPS_BY_TYPE = {
+  text:    [['contains','Contains'],['not_contains','Does not contain'],['equals','Equals']],
+  select:  [['is','Is'],['is_not','Is not']],
+  bool:    [['is_true','Is true'],['is_false','Is false']],
+  flag:    [['is_true','Yes'],['is_false','No / unset']],
+  number:  [['gte','≥'],['lte','≤'],['eq','='],['neq','≠'],['gt','>'],['lt','<']],
+  percent: [['gte','≥'],['lte','≤'],['eq','='],['neq','≠'],['gt','>'],['lt','<']],
+};
+
+let conditions = []; // {id, field, op, value}
+let condIdSeq = 1;
+let matchMode = 'ALL'; // 'ALL' or 'ANY'
+
+function fieldMeta(key){ return FIELDS.find(f=>f.key===key); }
+
+function addCondition(){
+  conditions.push({id: condIdSeq++, field:'name', op:'contains', value:''});
+  renderConditions();
+}
+
+function removeCondition(id){
+  conditions = conditions.filter(c=>c.id!==id);
+  renderConditions();
+  render();
+}
+
+function updateCondition(id, patch){
+  const c = conditions.find(c=>c.id===id);
+  if(!c) return;
+  Object.assign(c, patch);
+  // reset op/value if field type changed
+  if(patch.field){
+    const meta = fieldMeta(patch.field);
+    c.op = OPS_BY_TYPE[meta.type][0][0];
+    c.value = '';
+  }
+  renderConditions();
+  render();
+}
+
+function renderConditions(){
+  const list = document.getElementById('condList');
+  if(conditions.length===0){
+    list.innerHTML = `<div class="cond-empty">No advanced conditions yet — add one to build a custom AND/OR filter across any column.</div>`;
+    return;
+  }
+  list.innerHTML = conditions.map((c, i)=>{
+    const meta = fieldMeta(c.field);
+    const ops = OPS_BY_TYPE[meta.type];
+    const joinLabel = i===0 ? 'WHERE' : matchMode;
+    let valueInput;
+    if(meta.type==='select'){
+      const opts = meta.options || [];
+      valueInput = `<select class="cond-val" data-role="value" data-id="${c.id}">
+        ${opts.map(o=>`<option value="${o}" ${c.value===o?'selected':''}>${o}</option>`).join('')}
+      </select>`;
+    } else if(meta.type==='bool' || meta.type==='flag'){
+      valueInput = `<span></span>`; // no value needed, op carries the meaning
+    } else {
+      const step = meta.type==='percent' ? '1' : '1';
+      const ph = meta.type==='percent' ? 'e.g. 60' : 'value';
+      valueInput = `<input class="cond-val" data-role="value" data-id="${c.id}" type="number" step="${step}" placeholder="${ph}" value="${c.value}">`;
+    }
+    return `
+      <div class="cond-row">
+        <span class="cond-join">${joinLabel}</span>
+        <select class="cond-field" data-role="field" data-id="${c.id}">
+          ${FIELDS.map(f=>`<option value="${f.key}" ${c.field===f.key?'selected':''}>${f.label}</option>`).join('')}
+        </select>
+        <select class="cond-op" data-role="op" data-id="${c.id}">
+          ${ops.map(([v,l])=>`<option value="${v}" ${c.op===v?'selected':''}>${l}</option>`).join('')}
+        </select>
+        ${valueInput}
+        <button class="cond-remove" data-id="${c.id}" title="Remove condition">&times;</button>
+      </div>
+    `;
+  }).join('');
+
+  list.querySelectorAll('[data-role="field"]').forEach(el=>{
+    el.addEventListener('change', e=> updateCondition(Number(e.target.dataset.id), {field:e.target.value}));
+  });
+  list.querySelectorAll('[data-role="op"]').forEach(el=>{
+    el.addEventListener('change', e=> updateCondition(Number(e.target.dataset.id), {op:e.target.value}));
+  });
+  list.querySelectorAll('[data-role="value"]').forEach(el=>{
+    el.addEventListener('input', e=> updateCondition(Number(e.target.dataset.id), {value:e.target.value}));
+  });
+  list.querySelectorAll('.cond-remove').forEach(el=>{
+    el.addEventListener('click', e=> removeCondition(Number(e.target.dataset.id)));
+  });
+}
+
+function evalCondition(row, c){
+  const meta = fieldMeta(c.field);
+  let rv = row[c.field];
+  if(meta.type==='text'){
+    const rs = (rv||'').toString().toLowerCase();
+    const cv = (c.value||'').toLowerCase();
+    if(c.op==='contains') return cv==='' ? true : rs.includes(cv);
+    if(c.op==='not_contains') return cv==='' ? true : !rs.includes(cv);
+    if(c.op==='equals') return rs === cv;
+  }
+  if(meta.type==='select'){
+    if(c.value==='') return true;
+    if(c.op==='is') return rv === c.value;
+    if(c.op==='is_not') return rv !== c.value;
+  }
+  if(meta.type==='bool'){
+    const truthy = rv === true;
+    if(c.op==='is_true') return truthy;
+    if(c.op==='is_false') return !truthy;
+  }
+  if(meta.type==='flag'){
+    const truthy = isFlagged(row);
+    if(c.op==='is_true') return truthy;
+    if(c.op==='is_false') return !truthy;
+  }
+  if(meta.type==='number' || meta.type==='percent'){
+    if(c.value===''||c.value===null||c.value===undefined) return true;
+    if(rv===null||rv===undefined) return false;
+    let target = Number(c.value);
+    let actual = rv;
+    if(meta.type==='percent'){ actual = rv*100; }
+    if(c.op==='gte') return actual >= target;
+    if(c.op==='lte') return actual <= target;
+    if(c.op==='eq') return actual === target;
+    if(c.op==='neq') return actual !== target;
+    if(c.op==='gt') return actual > target;
+    if(c.op==='lt') return actual < target;
+  }
+  return true;
+}
+
+function passesConditions(row){
+  if(conditions.length===0) return true;
+  if(matchMode==='ALL'){
+    return conditions.every(c=>evalCondition(row, c));
+  } else {
+    return conditions.some(c=>evalCondition(row, c));
+  }
+}
+
+function wireMatchToggle(){
+  const allBtn = document.getElementById('matchAll');
+  const anyBtn = document.getElementById('matchAny');
+  const help = document.getElementById('matchHelp');
+  allBtn.addEventListener('click', ()=>{
+    matchMode='ALL'; allBtn.classList.add('active'); anyBtn.classList.remove('active');
+    help.textContent = 'Every condition below must be true.';
+    renderConditions(); render();
+  });
+  anyBtn.addEventListener('click', ()=>{
+    matchMode='ANY'; anyBtn.classList.add('active'); allBtn.classList.remove('active');
+    help.textContent = 'At least one condition below must be true.';
+    renderConditions(); render();
+  });
+}
+
+function fmtMoney(v){ return (v===null||v===undefined||v==='') ? '—' : '$'+Number(v).toLocaleString(); }
+function fmtPct(v){ return (v===null||v===undefined) ? '—' : Math.round(v*100)+'%'; }
+// The sheet's "Interested?" column uses 'x' to flag interest and 'N' to
+// explicitly rule a school out — anything else (blank) means unset.
+function isFlagged(row){
+  const v = (row.interested || '').trim().toUpperCase();
+  return v !== '' && v !== 'N';
+}
+
+function divBadges(row){
+  let out = '';
+  if(row.ncaa_lax){
+    const cls = row.ncaa_div==='Division I'?'d1':row.ncaa_div==='Division II'?'d2':'d3';
+    const label = row.ncaa_div==='Division I'?'NCAA D1':row.ncaa_div==='Division II'?'NCAA D2':'NCAA D3';
+    out += `<span class="badge ${cls}">${label}</span> `;
+  }
+  if(row.mcla_lax){
+    out += `<span class="badge mcla">MCLA</span>`;
+  }
+  if(!row.ncaa_lax && !row.mcla_lax){
+    out += `<span class="badge none">—</span>`;
+  }
+  return out;
+}
+
+function populateStateFilter(){
+  const states = [...new Set(DATA.map(r=>r.state))].sort();
+  const sel = document.getElementById('stateSelect');
+  states.forEach(s=>{
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    sel.appendChild(opt);
+  });
+}
+
+function renderStats(){
+  const total = DATA.length;
+  const withTuition = DATA.filter(r=>r.tuition_in);
+  const avgIn = Math.round(withTuition.reduce((a,r)=>a+r.tuition_in,0)/withTuition.length);
+  const d1 = DATA.filter(r=>r.ncaa_div==='Division I').length;
+  const d2 = DATA.filter(r=>r.ncaa_div==='Division II').length;
+  const d3 = DATA.filter(r=>r.ncaa_div==='Division III').length;
+  const mcla = DATA.filter(r=>r.mcla_lax).length;
+  const states = new Set(DATA.map(r=>r.state)).size;
+  const stats = [
+    [total, 'Programs'],
+    [d1, 'NCAA D1'],
+    [d2, 'NCAA D2'],
+    [d3, 'NCAA D3'],
+    [mcla, 'MCLA Club'],
+    [states, 'States'],
+    ['$'+avgIn.toLocaleString(), 'Avg In-State'],
+  ];
+  document.getElementById('statStrip').innerHTML = stats.map(([n,l])=>
+    `<div class="stat"><div class="num">${n}</div><div class="lbl">${l}</div></div>`).join('');
+}
+
+function renderDivChips(){
+  const chips = [
+    {key:'Division I', label:'NCAA D1'},
+    {key:'Division II', label:'NCAA D2'},
+    {key:'Division III', label:'NCAA D3'},
+    {key:'MCLA', label:'MCLA Club'},
+  ];
+  const el = document.getElementById('divChips');
+  el.innerHTML = chips.map(c=>`<span class="chip${state.divFilter.has(c.key)?' active':''}" data-div="${c.key}">${c.label}</span>`).join('');
+  el.querySelectorAll('.chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      const d = chip.dataset.div;
+      if(state.divFilter.has(d)){ state.divFilter.delete(d); chip.classList.remove('active'); }
+      else { state.divFilter.add(d); chip.classList.add('active'); }
+      render();
+    });
+  });
+}
+
+function renderHead(){
+  const row = document.getElementById('headRow');
+  row.innerHTML = columns.map(c=>{
+    const arrow = c.sort ? `<span class="arrow">${state.sortKey===c.key ? (state.sortDir===1?'▲':'▼') : '↕'}</span>` : '';
+    const sortedClass = state.sortKey===c.key ? 'sorted' : '';
+    return `<th data-key="${c.key}" data-sortable="${!!c.sort}" class="${sortedClass}">${c.label}${arrow}</th>`;
+  }).join('');
+  row.querySelectorAll('th').forEach(th=>{
+    if(th.dataset.sortable==='true'){
+      th.addEventListener('click', ()=>{
+        const key = th.dataset.key;
+        if(state.sortKey===key){ state.sortDir *= -1; }
+        else { state.sortKey = key; state.sortDir = 1; }
+        render();
+      });
+    }
+  });
+}
+
+function getFiltered(){
+  let rows = DATA.filter(r=>{
+    if(state.search){
+      const s = state.search.toLowerCase();
+      if(!r.name.toLowerCase().includes(s) && !r.city.toLowerCase().includes(s)) return false;
+    }
+    if(state.stateFilter && r.state !== state.stateFilter) return false;
+    if(state.ownership && r.ownership !== state.ownership) return false;
+    if(state.wue && !r.wue) return false;
+    if(state.sage && !r.sage) return false;
+    if(state.interested && !isFlagged(r)) return false;
+    if(state.divFilter.size > 0){
+      const matches = [...state.divFilter].some(d=>{
+        if(d==='MCLA') return r.mcla_lax;
+        return r.ncaa_lax && r.ncaa_div===d;
+      });
+      if(!matches) return false;
+    }
+    if(r.tuition_out && r.tuition_out > state.maxTuition) return false;
+    if(!passesConditions(r)) return false;
+    return true;
+  });
+
+  rows.sort((a,b)=>{
+    let av = a[state.sortKey], bv = b[state.sortKey];
+    if(av===null||av===undefined) av = state.sortDir===1 ? Infinity : -Infinity;
+    if(bv===null||bv===undefined) bv = state.sortDir===1 ? Infinity : -Infinity;
+    if(typeof av==='string') return av.localeCompare(bv) * state.sortDir;
+    return (av-bv) * state.sortDir;
+  });
+  return rows;
+}
+
+function renderRows(rows){
+  const tbody = document.getElementById('tbody');
+  const empty = document.getElementById('emptyState');
+  if(rows.length===0){
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  tbody.innerHTML = rows.map(r=>`
+    <tr class="${isFlagged(r) ? 'interested':''}">
+      <td>
+        <div class="school-name">${isFlagged(r) ? '<span class=\"star\">&#9733;</span> ' : ''}${r.name}</div>
+      </td>
+      <td class="school-loc">${r.city}, ${r.state}</td>
+      <td>${r.ownership}</td>
+      <td>${divBadges(r)}</td>
+      <td class="mono">${fmtMoney(r.tuition_in)}</td>
+      <td class="mono">${fmtMoney(r.tuition_out)}</td>
+      <td class="mono">${r.ug_enroll ? Number(r.ug_enroll).toLocaleString() : '—'}</td>
+      <td class="mono">${fmtPct(r.admit_rate)}</td>
+      <td>${r.wue ? '<span class="pill">WUE</span> ' : ''}${r.sage ? '<span class="pill">SAGE</span>' : ''}</td>
+    </tr>
+  `).join('');
+}
+
+function render(){
+  renderHead();
+  const rows = getFiltered();
+  document.getElementById('resultLine').innerHTML = `Showing <b>${rows.length}</b> of <b>${DATA.length}</b> programs`;
+  renderRows(rows);
+}
+
+function wireControls(){
+  document.getElementById('searchInput').addEventListener('input', e=>{ state.search = e.target.value; render(); });
+  document.getElementById('stateSelect').addEventListener('change', e=>{ state.stateFilter = e.target.value; render(); });
+  document.getElementById('ownershipSelect').addEventListener('change', e=>{ state.ownership = e.target.value; render(); });
+  document.getElementById('wueCheck').addEventListener('change', e=>{ state.wue = e.target.checked; render(); });
+  document.getElementById('sageCheck').addEventListener('change', e=>{ state.sage = e.target.checked; render(); });
+  document.getElementById('interestedCheck').addEventListener('change', e=>{ state.interested = e.target.checked; render(); });
+  document.getElementById('tuitionSlider').addEventListener('input', e=>{
+    state.maxTuition = Number(e.target.value);
+    document.getElementById('tuitionVal').textContent = state.maxTuition >= 65000 ? 'Any' : '$'+state.maxTuition.toLocaleString();
+    render();
+  });
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    state = {search:'', stateFilter:'', ownership:'', divFilter:new Set(), wue:false, sage:false, interested:false, maxTuition:65000, sortKey:'name', sortDir:1};
+    document.getElementById('searchInput').value='';
+    document.getElementById('stateSelect').value='';
+    document.getElementById('ownershipSelect').value='';
+    document.getElementById('wueCheck').checked=false;
+    document.getElementById('sageCheck').checked=false;
+    document.getElementById('interestedCheck').checked=false;
+    document.getElementById('tuitionSlider').value=65000;
+    document.getElementById('tuitionVal').textContent='Any';
+    document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    render();
+  });
+}
+
+// ---------- Number/text cleanup helpers ----------
+function cleanNum(v){
+  if(v===null || v===undefined || v==='') return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}
+function cleanStr(v){
+  if(v===null || v===undefined) return '';
+  return String(v).trim();
+}
+
+// Reads a cell's raw value from a gviz table row (0-indexed column)
+function cell(row, idx){
+  if(!row || !row.c || !row.c[idx]) return null;
+  return row.c[idx].v;
+}
+
+// Maps a raw gviz row object to our record shape
+function buildRecord(row){
+  const name = cleanStr(cell(row, 3));
+  if(!name) return null;
+  const admitA = cleanNum(cell(row, 22));
+  const admitB = cleanNum(cell(row, 23));
+  return {
+    unitid: cleanNum(cell(row, 1)),
+    interested: cleanStr(cell(row, 2)),
+    name: name,
+    city: cleanStr(cell(row, 4)),
+    state: cleanStr(cell(row, 5)),
+    ownership: cleanStr(cell(row, 7)) || '—',
+    wue: cleanStr(cell(row, 8)) === 'Yes',
+    sage: cleanStr(cell(row, 9)) === 'Yes',
+    tuition_in: cleanNum(cell(row, 10)),
+    tuition_out: cleanNum(cell(row, 11)),
+    ncaa_lax: cleanStr(cell(row, 16)) === 'Yes',
+    ncaa_div: cleanStr(cell(row, 17)) || null,
+    mcla_lax: cleanStr(cell(row, 18)) === 'Yes',
+    ug_enroll: cleanNum(cell(row, 20)),
+    admit_rate: admitA !== null ? admitA : admitB,
+  };
+}
+
+function setSyncState(kind, text){
+  const dot = document.getElementById('syncDot');
+  const label = document.getElementById('syncText');
+  dot.className = 'sync-dot' + (kind ? ' '+kind : '');
+  label.textContent = text;
+}
+
+function showLoadScreen(){
+  document.getElementById('loadScreen').classList.remove('hidden');
+  document.getElementById('errorScreen').classList.add('hidden');
+  document.getElementById('appBody').classList.add('hidden');
+}
+function showError(msg){
+  document.getElementById('loadScreen').classList.add('hidden');
+  document.getElementById('appBody').classList.add('hidden');
+  document.getElementById('errorScreen').classList.remove('hidden');
+  document.getElementById('errorMsg').textContent = msg;
+  setSyncState('error', 'Sync failed');
+}
+function showApp(){
+  document.getElementById('loadScreen').classList.add('hidden');
+  document.getElementById('errorScreen').classList.add('hidden');
+  document.getElementById('appBody').classList.remove('hidden');
+}
+
+let loadTimeoutId = null;
+
+// Google's CSV/JSON export endpoints don't send CORS headers, so a plain
+// fetch() gets blocked by the browser. Loading the response as a <script>
+// (JSONP) sidesteps that -- Google's gviz endpoint supports a
+// "responseHandler" callback made exactly for this purpose.
+window.__onSheetData = function(json){
+  if(loadTimeoutId){ clearTimeout(loadTimeoutId); loadTimeoutId = null; }
+  try{
+    if(!json || json.status === 'error'){
+      const reason = (json && json.errors && json.errors[0] && json.errors[0].detailed_message) || 'Unknown error from Google Sheets.';
+      throw new Error(reason);
+    }
+    const rows = json.table.rows;
+    const built = rows.slice(3).map(buildRecord).filter(r=>r !== null);
+    const laxOnly = built.filter(r=>r.ncaa_lax || r.mcla_lax);
+    if(laxOnly.length === 0){
+      throw new Error('Connected, but found zero rows with lacrosse data — the "Schools" tab layout may have changed.');
+    }
+    DATA = laxOnly;
+    initApp();
+    const now = new Date();
+    setSyncState('', 'Live — synced ' + now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
+    showApp();
+  } catch(err){
+    showError(err.message || String(err));
+  } finally {
+    document.getElementById('refreshBtn').disabled = false;
+  }
+};
+
+function loadData(){
+  showLoadScreen();
+  setSyncState('loading', 'Connecting to sheet…');
+  document.getElementById('refreshBtn').disabled = true;
+
+  const old = document.getElementById('gvizScript');
+  if(old) old.remove();
+
+  const script = document.createElement('script');
+  script.id = 'gvizScript';
+  script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:__onSheetData&headers=0&sheet=${encodeURIComponent(SHEET_NAME)}&_=${Date.now()}`;
+  script.onerror = function(){
+    if(loadTimeoutId){ clearTimeout(loadTimeoutId); loadTimeoutId = null; }
+    showError('Could not reach the sheet. Confirm the tab is still named "Schools" and sharing is set to "Anyone with the link — Viewer".');
+    document.getElementById('refreshBtn').disabled = false;
+  };
+  loadTimeoutId = setTimeout(function(){
+    showError('Timed out waiting for a response from Google Sheets. Try again in a moment.');
+    document.getElementById('refreshBtn').disabled = false;
+  }, 15000);
+  document.body.appendChild(script);
+}
+
+function initApp(){
+  DATA.forEach(r=>{ r.loc = r.city+', '+r.state; r.elig = (r.wue?1:0)+(r.sage?1:0); });
+  fieldMeta('state').options = [...new Set(DATA.map(r=>r.state))].sort();
+
+  // reset any filters from a previous load so stale option elements don't linger
+  document.getElementById('stateSelect').innerHTML = '<option value="">All states</option>';
+
+  populateStateFilter();
+  renderStats();
+  renderDivChips();
+  renderConditions();
+  render();
+}
+
+wireControls();
+wireMatchToggle();
+document.getElementById('refreshBtn').addEventListener('click', loadData);
+document.getElementById('retryBtn').addEventListener('click', loadData);
+document.getElementById('addCondBtn').addEventListener('click', addCondition);
+
+loadData();
+</script>
+</body>
+</html>
