@@ -278,6 +278,15 @@
     padding:2px 7px; border-radius:999px; border:1px solid #DCD5C0; color:var(--ink-dim);
   }
   .star{color:var(--gold); font-size:14px;}
+  .links-cell{white-space:nowrap;}
+  .link-icon{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:26px; height:26px; border-radius:6px; margin-right:4px;
+    font-size:14px; text-decoration:none; border:1px solid #DCD5C0;
+    background:var(--chalk); cursor:pointer; line-height:1;
+  }
+  .link-icon:hover{border-color:var(--gold); background:#FBF1DC;}
+  button.link-icon{font-family:inherit;}
   .empty-state{
     text-align:center; padding:64px 20px; color:var(--ink-dim);
     font-family:'Barlow Condensed', sans-serif; font-size:16px;
@@ -507,6 +516,7 @@ const columns = [
   {key:'ug_enroll', label:'UG Enroll', sort:true},
   {key:'admit_rate', label:'Admit Rate', sort:true},
   {key:'elig', label:'Eligibility', sort:false},
+  {key:'links', label:'Links', sort:false},
 ];
 
 let state = {
@@ -1114,7 +1124,14 @@ function getFiltered(){
   return rows;
 }
 
+function escapeAttr(str){
+  return String(str||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+let lastRenderedRows = [];
+
 function renderRows(rows){
+  lastRenderedRows = rows;
   const tbody = document.getElementById('tbody');
   const empty = document.getElementById('emptyState');
   if(rows.length===0){
@@ -1123,7 +1140,7 @@ function renderRows(rows){
     return;
   }
   empty.style.display = 'none';
-  tbody.innerHTML = rows.map(r=>`
+  tbody.innerHTML = rows.map((r,i)=>`
     <tr class="${isFlagged(r) ? 'interested':''}">
       <td>
         <div class="school-name">${isFlagged(r) ? '<span class=\"star\">&#9733;</span> ' : ''}${r.name}</div>
@@ -1136,8 +1153,38 @@ function renderRows(rows){
       <td class="mono">${r.ug_enroll ? Number(r.ug_enroll).toLocaleString() : '—'}</td>
       <td class="mono">${fmtPct(r.admit_rate)}</td>
       <td>${r.wue ? '<span class="pill">WUE</span> ' : ''}${r.sage ? '<span class="pill">SAGE</span>' : ''}</td>
+      <td class="links-cell">
+        <a class="link-icon" href="https://www.google.com/search?q=${encodeURIComponent(r.name+' official website')}" target="_blank" rel="noopener" title="Search for ${escapeAttr(r.name)}'s website">🌐</a>
+        <button class="link-icon ask-claude-btn" data-idx="${i}" title="Copy a starter prompt about ${escapeAttr(r.name)} for Claude">🤖</button>
+      </td>
     </tr>
   `).join('');
+}
+
+function claudePromptFor(r){
+  const progLabel = r.ncaa_lax ? `NCAA ${r.ncaa_div}` : (r.mcla_lax ? 'MCLA club' : 'lacrosse');
+  return `Tell me about ${r.name} in ${r.city}, ${r.state}. Give me the basics: academic reputation, campus size and setting, approximate cost, and what its ${progLabel} lacrosse program is like. I'm a high school lacrosse player considering it for college.`;
+}
+
+function wireLinksDelegation(){
+  document.getElementById('tbody').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.ask-claude-btn');
+    if(!btn) return;
+    const idx = Number(btn.dataset.idx);
+    const r = lastRenderedRows[idx];
+    if(!r) return;
+    const prompt = claudePromptFor(r);
+    const original = btn.textContent;
+    const openClaude = ()=>{ window.open('https://claude.ai/new', '_blank', 'noopener'); };
+    const flash = (label)=>{ btn.textContent = label; setTimeout(()=>{ btn.textContent = original; }, 1500); };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(prompt).then(()=>{ flash('✓'); openClaude(); })
+        .catch(()=>{ window.prompt('Copy this, then paste into Claude:', prompt); openClaude(); });
+    } else {
+      window.prompt('Copy this, then paste into Claude:', prompt);
+      openClaude();
+    }
+  });
 }
 
 function render(){
@@ -1326,6 +1373,7 @@ wireControls();
 wireMatchToggle();
 wireSavedFilters();
 wireCopyLink();
+wireLinksDelegation();
 document.getElementById('refreshBtn').addEventListener('click', loadData);
 document.getElementById('retryBtn').addEventListener('click', loadData);
 document.getElementById('addCondBtn').addEventListener('click', addCondition);
