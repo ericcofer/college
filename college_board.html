@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Trey's College Board — College Lacrosse</title>
+<title>Recruiting Board — College Lacrosse</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -198,6 +198,38 @@
     font-weight:600;
   }
   .result-line b{color:var(--turf); font-weight:700;}
+
+  .saved-row{
+    border-top:1px dashed #E3DDCB;
+    padding-top:12px; margin-top:2px;
+  }
+  .saved-label{
+    font-family:'Barlow Condensed', sans-serif; font-weight:700; font-size:13px;
+    letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-dim);
+  }
+  #savedFilterSelect{min-width:200px;}
+  .save-btn{
+    font-family:'Barlow Condensed', sans-serif; font-weight:700; font-size:13px; letter-spacing:0.03em;
+    background:var(--gold); color:var(--turf-dark); border:none; border-radius:7px;
+    padding:8px 12px; cursor:pointer;
+  }
+  .save-btn:hover{background:var(--gold-bright);}
+  .delete-saved-btn{
+    font-family:'Barlow Condensed', sans-serif; font-weight:700; font-size:12.5px; letter-spacing:0.03em;
+    background:none; color:var(--brick); border:1.5px solid #E8B8B0; border-radius:7px;
+    padding:6px 11px; cursor:pointer;
+  }
+  .delete-saved-btn:hover{background:#FBEDEA;}
+  .link-btn{
+    font-family:'Barlow Condensed', sans-serif; font-weight:700; font-size:13px; letter-spacing:0.03em;
+    background:var(--turf); color:var(--chalk); border:none; border-radius:7px;
+    padding:8px 12px; cursor:pointer;
+  }
+  .link-btn:hover{background:var(--turf-dark);}
+  .link-btn.copied{background:#2B6B45;}
+  .saved-note{
+    font-family:'Barlow Condensed', sans-serif; font-size:12px; color:var(--ink-dim); font-style:italic;
+  }
 
   /* ---------- Table ---------- */
   .table-wrap{padding:6px 32px 48px;}
@@ -421,6 +453,14 @@
       <span class="slider-val" id="tuitionVal">Any</span>
     </div>
   </div>
+  <div class="controls-row saved-row">
+    <span class="saved-label">Saved filters</span>
+    <select id="savedFilterSelect"><option value="">Select a saved filter…</option></select>
+    <button class="save-btn" id="saveFilterBtn">+ Save current</button>
+    <button class="delete-saved-btn hidden" id="deleteSavedBtn" title="Delete selected saved filter">Delete</button>
+    <button class="link-btn" id="copyLinkBtn" title="Copy a link that reproduces the current filters">🔗 Copy link to these filters</button>
+    <span class="saved-note hidden" id="savedNote">Saved in this browser only</span>
+  </div>
 </div>
 
 <div class="adv-panel">
@@ -455,6 +495,7 @@ const SHEET_NAME = 'Schools';
 
 let DATA = [];
 let sliderMax = 65000;
+let urlFilterApplied = false;
 
 const columns = [
   {key:'name', label:'School', sort:true},
@@ -650,6 +691,301 @@ function wireMatchToggle(){
   });
 }
 
+// ---------- Saved filters ----------
+// Two modes, auto-selected by whether SCRIPT_URL is filled in:
+//  - SCRIPT_URL set: saved filters live in the "SavedFilters" tab of the
+//    sheet itself, shared with anyone who opens this page (read via gviz,
+//    written via a small Apps Script Web App — see setup notes).
+//  - SCRIPT_URL blank: falls back to this browser's localStorage only.
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzMv5EFzG4EowwqI4ZYAPhroHQORsyD4BVyJ26c6KtQW-HLxnc1pmphtESURp4ZHtg/exec';
+const SAVED_FILTERS_SHEET = 'SavedFilters';
+const SAVED_FILTERS_KEY = 'laxBoard_savedFilters_v1';
+let storageAvailable = true;
+let sharedFiltersCache = [];
+
+function readSavedFilters(){
+  try{
+    return JSON.parse(localStorage.getItem(SAVED_FILTERS_KEY) || '[]');
+  } catch(e){
+    storageAvailable = false;
+    return [];
+  }
+}
+function writeSavedFilters(list){
+  try{
+    localStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify(list));
+  } catch(e){
+    storageAvailable = false;
+  }
+}
+function currentFilterList(){
+  return SCRIPT_URL ? sharedFiltersCache : readSavedFilters();
+}
+
+// Reads the "SavedFilters" tab the same way the Schools tab is read —
+// no auth needed, this is a GET disguised as a <script> load (JSONP).
+function loadSharedFilters(callback){
+  if(!SCRIPT_URL){ callback([]); return; }
+  const old = document.getElementById('sfScript');
+  if(old) old.remove();
+  window.__onSavedFiltersData = function(json){
+    try{
+      if(!json || json.status !== 'ok'){ callback([]); return; }
+      const rows = (json.table.rows || []).slice(1); // row 0 = Name/Data/UpdatedAt header
+      const list = rows.map(r=>{
+        const name = r.c && r.c[0] ? r.c[0].v : null;
+        const dataStr = r.c && r.c[1] ? r.c[1].v : null;
+        if(!name || !dataStr) return null;
+        try{ return {name, data: JSON.parse(dataStr)}; } catch(e){ return null; }
+      }).filter(Boolean);
+      callback(list);
+    } catch(e){ callback([]); }
+  };
+  const script = document.createElement('script');
+  script.id = 'sfScript';
+  script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:__onSavedFiltersData&headers=1&sheet=${encodeURIComponent(SAVED_FILTERS_SHEET)}&_=${Date.now()}`;
+  script.onerror = ()=> callback([]);
+  document.body.appendChild(script);
+}
+
+// Writes go through the Apps Script Web App. Content-Type text/plain avoids
+// a CORS preflight that Apps Script doesn't handle; the actual response
+// (after Google's internal redirect) does allow reading the result.
+function postToScript(payload){
+  return fetch(SCRIPT_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'text/plain;charset=utf-8'},
+    body: JSON.stringify(payload),
+  });
+}
+function saveFilterRemote(name, data){
+  return postToScript({action:'save', name, data}).then(()=>true).catch(()=>false);
+}
+function deleteFilterRemote(name){
+  return postToScript({action:'delete', name}).then(()=>true).catch(()=>false);
+}
+
+function refreshSavedFilterUI(){
+  if(SCRIPT_URL){
+    loadSharedFilters((list)=>{
+      sharedFiltersCache = list;
+      populateSavedFilterSelect();
+    });
+  } else {
+    populateSavedFilterSelect();
+  }
+}
+
+function serializeCurrentFilters(){
+  return {
+    search: state.search,
+    stateFilter: state.stateFilter,
+    ownership: state.ownership,
+    divFilter: [...state.divFilter],
+    wue: state.wue,
+    sage: state.sage,
+    interested: state.interested,
+    maxTuition: (state.maxTuition === Infinity) ? null : state.maxTuition,
+    sortKey: state.sortKey,
+    sortDir: state.sortDir,
+    matchMode: matchMode,
+    conditions: conditions.map(c => ({field:c.field, op:c.op, value:c.value})),
+  };
+}
+function applySavedFilterData(d){
+  state.search = d.search || '';
+  state.stateFilter = d.stateFilter || '';
+  state.ownership = d.ownership || '';
+  state.divFilter = new Set(d.divFilter || []);
+  state.wue = !!d.wue;
+  state.sage = !!d.sage;
+  state.interested = !!d.interested;
+  state.maxTuition = (d.maxTuition === null || d.maxTuition === undefined) ? Infinity : d.maxTuition;
+  state.sortKey = d.sortKey || 'name';
+  state.sortDir = d.sortDir || 1;
+  matchMode = d.matchMode === 'ANY' ? 'ANY' : 'ALL';
+  conditions = (d.conditions || []).map(c => ({id: condIdSeq++, field:c.field, op:c.op, value:c.value}));
+
+  // sync DOM controls to match restored state
+  document.getElementById('searchInput').value = state.search;
+  document.getElementById('stateSelect').value = state.stateFilter;
+  document.getElementById('ownershipSelect').value = state.ownership;
+  document.getElementById('wueCheck').checked = state.wue;
+  document.getElementById('sageCheck').checked = state.sage;
+  document.getElementById('interestedCheck').checked = state.interested;
+  const tSlider = document.getElementById('tuitionSlider');
+  const isAny = state.maxTuition === Infinity;
+  tSlider.value = isAny ? sliderMax : Math.min(state.maxTuition, sliderMax);
+  document.getElementById('tuitionVal').textContent = isAny ? 'Any' : '$'+state.maxTuition.toLocaleString();
+  const allBtn = document.getElementById('matchAll');
+  const anyBtn = document.getElementById('matchAny');
+  const help = document.getElementById('matchHelp');
+  if(matchMode==='ANY'){
+    anyBtn.classList.add('active'); allBtn.classList.remove('active');
+    help.textContent = 'At least one condition below must be true.';
+  } else {
+    allBtn.classList.add('active'); anyBtn.classList.remove('active');
+    help.textContent = 'Every condition below must be true.';
+  }
+
+  renderDivChips();
+  renderConditions();
+  render();
+}
+
+function populateSavedFilterSelect(){
+  const sel = document.getElementById('savedFilterSelect');
+  const list = currentFilterList();
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Select a saved filter…</option>' +
+    list.map((f,i)=>`<option value="${i}">${f.name}</option>`).join('');
+  if(list[current]) sel.value = current;
+}
+
+// ---------- Portable filter links (works cross-browser/device, no storage needed) ----------
+function encodeFilterToParam(data){
+  const json = JSON.stringify(data);
+  let b64;
+  try{ b64 = btoa(unescape(encodeURIComponent(json))); }
+  catch(e){ b64 = btoa(json); }
+  return b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function decodeFilterFromParam(param){
+  try{
+    let b64 = param.replace(/-/g,'+').replace(/_/g,'/');
+    while(b64.length % 4) b64 += '=';
+    const json = decodeURIComponent(escape(atob(b64)));
+    return JSON.parse(json);
+  } catch(e){
+    return null;
+  }
+}
+function checkUrlForFilter(){
+  const params = new URLSearchParams(window.location.search);
+  const f = params.get('f');
+  if(!f) return;
+  const data = decodeFilterFromParam(f);
+  if(data) applySavedFilterData(data);
+}
+// Keeps the address bar's ?f= param in sync with the live filter state
+// (via replaceState, so it doesn't spam browser history or reload the page).
+// That means the URL is always bookmarkable/copyable at any moment —
+// no separate "save a link" step required.
+let urlSyncScheduled = false;
+function syncUrlToState(){
+  if(urlSyncScheduled) return;
+  urlSyncScheduled = true;
+  requestAnimationFrame(()=>{
+    urlSyncScheduled = false;
+    try{
+      const data = serializeCurrentFilters();
+      const param = encodeFilterToParam(data);
+      const url = window.location.pathname + '?f=' + param;
+      window.history.replaceState(null, '', url);
+    } catch(e){ /* non-fatal if URL API is unavailable */ }
+  });
+}
+function wireCopyLink(){
+  const btn = document.getElementById('copyLinkBtn');
+  btn.addEventListener('click', ()=>{
+    const data = serializeCurrentFilters();
+    const param = encodeFilterToParam(data);
+    const url = window.location.origin + window.location.pathname + '?f=' + param;
+    const done = (ok)=>{
+      const original = '🔗 Copy link to these filters';
+      btn.textContent = ok ? '✓ Link copied' : 'Could not copy — see console';
+      btn.classList.toggle('copied', ok);
+      setTimeout(()=>{ btn.textContent = original; btn.classList.remove('copied'); }, 1800);
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(()=>done(true)).catch(()=>{
+        window.prompt('Copy this link:', url);
+        done(true);
+      });
+    } else {
+      window.prompt('Copy this link:', url);
+      done(true);
+    }
+  });
+}
+
+function wireSavedFilters(){
+  refreshSavedFilterUI();
+
+  const note = document.getElementById('savedNote');
+  if(SCRIPT_URL){
+    note.textContent = 'Shared — saved filters live in the sheet and are visible to anyone with this link.';
+    note.classList.remove('hidden');
+  } else if(!storageAvailable){
+    document.getElementById('saveFilterBtn').disabled = true;
+    document.getElementById('savedFilterSelect').disabled = true;
+    note.textContent = "Your browser is blocking local storage, so saved filters can't persist here.";
+    note.classList.remove('hidden');
+  } else {
+    note.textContent = 'Saved in this browser only — set up SCRIPT_URL to share these across devices.';
+    note.classList.remove('hidden');
+  }
+
+  document.getElementById('saveFilterBtn').addEventListener('click', ()=>{
+    const name = prompt('Name this filter (e.g. "Affordable D2 West Coast"):');
+    if(!name || !name.trim()) return;
+    const trimmed = name.trim();
+    const data = serializeCurrentFilters();
+    const btn = document.getElementById('saveFilterBtn');
+
+    if(SCRIPT_URL){
+      btn.disabled = true; btn.textContent = 'Saving…';
+      saveFilterRemote(trimmed, data).then(ok=>{
+        btn.disabled = false; btn.textContent = '+ Save current';
+        if(!ok){ alert('Could not save to the sheet. Check that SCRIPT_URL is correct and the Apps Script is deployed with "Anyone" access.'); return; }
+        refreshSavedFilterUI();
+      });
+    } else {
+      const list = readSavedFilters();
+      const existingIdx = list.findIndex(f => f.name === trimmed);
+      if(existingIdx >= 0) list[existingIdx] = {name: trimmed, data};
+      else list.push({name: trimmed, data});
+      writeSavedFilters(list);
+      populateSavedFilterSelect();
+      document.getElementById('savedFilterSelect').value = String(list.findIndex(f=>f.name===trimmed));
+      document.getElementById('deleteSavedBtn').classList.remove('hidden');
+    }
+  });
+
+  document.getElementById('savedFilterSelect').addEventListener('change', (e)=>{
+    const del = document.getElementById('deleteSavedBtn');
+    if(e.target.value === ''){ del.classList.add('hidden'); return; }
+    del.classList.remove('hidden');
+    const list = currentFilterList();
+    const entry = list[Number(e.target.value)];
+    if(entry) applySavedFilterData(entry.data);
+  });
+
+  document.getElementById('deleteSavedBtn').addEventListener('click', ()=>{
+    const sel = document.getElementById('savedFilterSelect');
+    if(sel.value === '') return;
+    const list = currentFilterList();
+    const entry = list[Number(sel.value)];
+    if(!entry) return;
+    if(!confirm(`Delete saved filter "${entry.name}"?`)) return;
+
+    if(SCRIPT_URL){
+      deleteFilterRemote(entry.name).then(ok=>{
+        if(!ok){ alert('Could not delete from the sheet.'); return; }
+        refreshSavedFilterUI();
+        sel.value = '';
+        document.getElementById('deleteSavedBtn').classList.add('hidden');
+      });
+    } else {
+      list.splice(Number(sel.value), 1);
+      writeSavedFilters(list);
+      populateSavedFilterSelect();
+      sel.value = '';
+      document.getElementById('deleteSavedBtn').classList.add('hidden');
+    }
+  });
+}
+
 function fmtMoney(v){ return (v===null||v===undefined||v==='') ? '—' : '$'+Number(v).toLocaleString(); }
 function fmtPct(v){ return (v===null||v===undefined) ? '—' : Math.round(v*100)+'%'; }
 // The sheet's "Interested?" column uses 'x' to flag interest and 'N' to
@@ -809,6 +1145,7 @@ function render(){
   const rows = getFiltered();
   document.getElementById('resultLine').innerHTML = `Showing <b>${rows.length}</b> of <b>${DATA.length}</b> programs`;
   renderRows(rows);
+  syncUrlToState();
 }
 
 function wireControls(){
@@ -927,6 +1264,7 @@ window.__onSheetData = function(json){
     }
     DATA = laxOnly;
     initApp();
+    if(!urlFilterApplied){ urlFilterApplied = true; checkUrlForFilter(); }
     const now = new Date();
     setSyncState('', 'Live — synced ' + now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
     showApp();
@@ -986,6 +1324,8 @@ function initApp(){
 
 wireControls();
 wireMatchToggle();
+wireSavedFilters();
+wireCopyLink();
 document.getElementById('refreshBtn').addEventListener('click', loadData);
 document.getElementById('retryBtn').addEventListener('click', loadData);
 document.getElementById('addCondBtn').addEventListener('click', addCondition);
